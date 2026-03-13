@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json" >
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>Planner</title>
+    <style>
+        :root {
+            --bg: #eff3f6; 
+            --pnl: #fffbf8; 
+            --blu: #6c99c9; 
+            --s-blu: #dbe4ee; 
+            --i-bg: #f5f0eb; 
+            --drk: #2c3e50;
+            --gry: #7f8c8d;
+            --red: #e74c3c;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg);
+            color: var(--drk);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            padding: 60px 20px;
+        }
+
+        .c { 
+            background: var(--pnl); 
+            padding: 40px; 
+            border-radius: 24px; 
+            width: 100%;
+            max-width: 420px; 
+            box-shadow: 0 20px 60px rgba(108, 153, 201, 0.12); 
+            position: relative;
+            border: 1px solid rgba(108, 153, 201, 0.08); 
+        }
+
+        .c::after {
+            content: "♡";
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            font-size: 1.2rem;
+            color: var(--s-blu);
+        }
+
+        h3 { 
+            font-family: 'Playfair Display', serif; 
+            font-size: 1rem; 
+            color: var(--blu);
+            margin-bottom: 8px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .disp {
+            font-weight: 600;
+            font-size: 3.2rem;
+            text-align: center;
+            margin-bottom: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .p-sgn { 
+            font-size: 1.8rem; 
+            color: var(--blu); 
+            margin-right: 8px; 
+        }
+
+        .grp { margin-bottom: 25px; }
+
+        input { 
+            width: 100%; 
+            box-sizing: border-box;
+            margin-bottom: 12px; 
+            padding: 16px; 
+            background: var(--i-bg); 
+            border: 1px solid transparent;
+            border-radius: 12px;
+            color: var(--drk);
+            outline: none;
+            font-size: 1rem;
+        }
+
+        input:focus { 
+            border-color: rgba(108, 153, 201, 0.2);
+            background: var(--pnl); 
+        }
+
+        .btns { display: grid; grid-template-columns: 1fr; gap: 10px; }
+
+        button { 
+            padding: 16px; 
+            background: var(--blu); 
+            color: var(--pnl); 
+            border: none; 
+            cursor: pointer; 
+            font-weight: 600;
+            border-radius: 12px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.3s;
+        }
+
+        button:hover { 
+            background: #5d8ab9;
+            transform: translateY(-2px);
+        }
+
+        .clr { 
+            background: transparent; 
+            color: var(--gry); 
+            font-size: 0.85rem;
+            margin-top: 10px;
+            border: 1px solid transparent;
+        }
+
+        .clr:hover { 
+            color: var(--red); 
+            background: rgba(231, 76, 60, 0.08);
+            border-color: rgba(231, 76, 60, 0.1);
+        }
+
+        ul { list-style: none; padding: 0; margin-top: 45px; border-top: 1px solid var(--s-blu); }
+
+        li { 
+            padding: 18px 5px; 
+            border-bottom: 1px solid var(--s-blu);
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+
+        .i-row { font-weight: 500; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;}
+        .i-row i { color: var(--blu); font-size: 0.6rem; opacity: 0.7; }
+
+        .a-row { font-weight: 600; font-size: 0.95rem; }
+        
+        .del { 
+            color: rgba(231, 76, 60, 0.15); 
+            cursor: pointer; 
+            margin-left: 15px; 
+            transition: 0.3s; 
+        }
+        .del:hover { color: var(--red); transform: scale(1.1); }
+    </style>
+</head>
+<body>
+
+<div class="c">
+    <h3>My Balance</h3>
+    <div class="disp"><span class="p-sgn">&#8369;</span><span id="tt">0.00</span></div>
+    
+    <div class="grp">
+        <input type="text" id="it" placeholder="Item">
+        <input type="number" id="am" placeholder="0.00">
+    </div>
+
+    <div class="btns">
+        <button onclick="ad()"><i class="fas fa-plus-circle"></i> Add Entry</button>
+        <button class="clr" onclick="cl()">Clear All</button>
+    </div>
+
+    <ul id="lst"></ul>
+</div>
+
+<script>
+    const _u = ""; // supabase URL
+    const _k = ""; // Publishable key
+    const sb = supabase.createClient(_u, _k);
+
+    const _t = document.getElementById('tt');
+    const _l = document.getElementById('lst');
+    const _i = document.getElementById('it');
+    const _a = document.getElementById('am');
+
+    async function shw() {
+        let { data: dt, error: er } = await sb.from('budget_db').select('*');
+        if (er) return;
+
+        _l.innerHTML = "";
+        let sum = 0;
+        dt.forEach(r => {
+            sum += r.amount;
+            let li = document.createElement('li');
+            li.innerHTML = `
+                <div class="i-row"><i class="fas fa-circle"></i> ${r.item}</div> 
+                <div class="a-row">
+                    &#8369;${r.amount.toFixed(2)} 
+                    <i class="fas fa-trash-alt del" onclick="rm(${r.id})"></i>
+                </div>
+            `;
+            _l.appendChild(li);
+        });
+        _t.innerText = sum.toLocaleString(undefined, {minimumFractionDigits: 2});
+    }
+
+    async function ad() {
+        let x = _i.value;
+        let y = parseFloat(_a.value);
+        if (x && y > 0) {
+            await sb.from('budget_db').insert([{ item: x, amount: y }]);
+            shw(); 
+            _i.value = ''; _a.value = '';
+        }
+    }
+
+    async function rm(id) {
+        await sb.from('budget_db').delete().eq('id', id);
+        shw();
+    }
+
+    async function cl() {
+        if(confirm("Clear logs?")) {
+            await sb.from('budget_db').delete().neq('id', 0);
+            shw();
+        }
+    }
+
+    shw();
+
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/service-worker.js")
+        .then(() => console.log("Ready na"))
+        .catch((e) => console.log(e));
+    }
+</script>
+
+</body>
+</html>
