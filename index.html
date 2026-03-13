@@ -18,6 +18,7 @@
             --drk: #2c3e50;
             --gry: #7f8c8d;
             --red: #e74c3c;
+            --grn: #27ae60;
         }
 
         body { 
@@ -63,10 +64,43 @@
             font-weight: 600;
             font-size: 3.2rem;
             text-align: center;
-            margin-bottom: 35px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
+        }
+
+        .wallet-info {
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--gry);
+            margin-bottom: 25px;
+            background: var(--s-blu);
+            padding: 5px 12px;
+            border-radius: 20px;
+            display: block;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Styling for the edit icon */
+        .edt-w {
+            margin-left: 8px;
+            cursor: pointer;
+            color: var(--blu);
+            font-size: 0.75rem;
+        }
+        .edt-w:hover { color: var(--drk); }
+
+        #advise-area {
+            font-size: 0.85rem;
+            padding: 15px;
+            background: #fff;
+            border-left: 4px solid var(--blu);
+            margin-bottom: 20px;
+            border-radius: 8px;
+            line-height: 1.4;
         }
 
         .p-sgn { 
@@ -162,8 +196,18 @@
     <h3>My Balance</h3>
     <div class="disp"><span class="p-sgn">&#8369;</span><span id="tt">0.00</span></div>
     
+    <div class="wallet-info">
+        <i class="fas fa-wallet"></i> E-Wallet: &#8369;<span id="ewallet">0.00</span>
+        <i class="fas fa-edit edt-w" onclick="editWallet()" title="Edit Wallet Balance"></i>
+    </div>
+
+    <div id="advise-area">
+        <strong>Insights:</strong><br>
+        <span id="advice-text">Add an entry to see your financial outlook.</span>
+    </div>
+    
     <div class="grp">
-        <input type="text" id="it" placeholder="Item">
+        <input type="text" id="it" placeholder="Item (e.g. Salary, Coffee)">
         <input type="number" id="am" placeholder="0.00">
     </div>
 
@@ -176,18 +220,27 @@
 </div>
 
 <script>
-    const _u = "https://hpvwtpmwgcmjcamtgawj.supabase.co"; // supabase URL
-    const _k = "sb_publishable_ivn9MkQo41I8JbeLEC2wDg_Cw4NndDI"; // Publishable key
+    const _u = "https://hpvwtpmwgcmjcamtgawj.supabase.co"; 
+    const _k = "sb_publishable_ivn9MkQo41I8JbeLEC2wDg_Cw4NndDI"; 
     const sb = supabase.createClient(_u, _k);
 
     const _t = document.getElementById('tt');
     const _l = document.getElementById('lst');
     const _i = document.getElementById('it');
     const _a = document.getElementById('am');
+    const _ew = document.getElementById('ewallet');
+    const _adv = document.getElementById('advice-text');
+
+    let myWallet = parseFloat(localStorage.getItem('budget_wallet')) || 0;
 
     async function shw() {
         let { data: dt, error: er } = await sb.from('budget_db').select('*');
-        if (er) return;
+        
+        if (er) {
+            dt = JSON.parse(localStorage.getItem('budget_entries')) || [];
+        } else {
+            localStorage.setItem('budget_entries', JSON.stringify(dt));
+        }
 
         _l.innerHTML = "";
         let sum = 0;
@@ -203,7 +256,21 @@
             `;
             _l.appendChild(li);
         });
+        
         _t.innerText = sum.toLocaleString(undefined, {minimumFractionDigits: 2});
+        _ew.innerText = myWallet.toLocaleString(undefined, {minimumFractionDigits: 2});
+
+        generateReport(dt, sum);
+    }
+
+    // NEW FUNCTION: Manual Wallet Edit
+    function editWallet() {
+        let newVal = prompt("Enter new E-Wallet balance:", myWallet.toFixed(2));
+        if (newVal !== null && !isNaN(parseFloat(newVal))) {
+            myWallet = parseFloat(newVal);
+            localStorage.setItem('budget_wallet', myWallet);
+            shw();
+        }
     }
 
     async function ad() {
@@ -211,9 +278,43 @@
         let y = parseFloat(_a.value);
         if (x && y > 0) {
             await sb.from('budget_db').insert([{ item: x, amount: y }]);
+
+            const incomeKeywords = ['salary', 'income', 'pay', 'allowance', 'deposit'];
+            const isIncome = incomeKeywords.some(keyword => x.toLowerCase().includes(keyword));
+            
+            if (isIncome) {
+                myWallet += y;
+            } else {
+                myWallet -= y;
+            }
+            
+            localStorage.setItem('budget_wallet', myWallet);
+            
             shw(); 
             _i.value = ''; _a.value = '';
         }
+    }
+
+    function generateReport(data, total) {
+        if (data.length === 0) return;
+
+        const avg = total / data.length;
+        const predictedFuture = total + (avg * 7);
+
+        let advice = "";
+        if (total > 10000) {
+            advice = "Your spending is high. Try to cut back on non-essentials.";
+        } else if (myWallet < 500) {
+            advice = "Wallet is low! Avoid new expenses until your next income.";
+        } else {
+            advice = "Your budget looks healthy. Keep tracking!";
+        }
+
+        _adv.innerHTML = `
+            <b>Report:</b> Spent ₱${total.toFixed(2)} across ${data.length} items.<br>
+            <b>Predict:</b> Next week may reach ₱${predictedFuture.toFixed(2)}.<br>
+            <b>Advice:</b> ${advice}
+        `;
     }
 
     async function rm(id) {
@@ -224,6 +325,7 @@
     async function cl() {
         if(confirm("Clear logs?")) {
             await sb.from('budget_db').delete().neq('id', 0);
+            localStorage.removeItem('budget_entries');
             shw();
         }
     }
